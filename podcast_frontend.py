@@ -8,11 +8,11 @@ def main():
  with open( "style.css" ) as css:
         st.markdown( f'<style>{css.read()}</style>' , unsafe_allow_html= True)
 
-    col1, col2 = st.columns([2, 8])
-    with col1:
+col1, col2 = st.columns([2, 8])
+ with col1:
         st.image("logo.png", caption="", use_column_width=True)
 
-    with col2:
+  with col2:
         st.title("NAVIGATING POLITICS IN AMERICA")
 
     available_podcast_info = create_dict_from_json_files('.')
@@ -22,7 +22,6 @@ def main():
     with tcol1:
 
         st.sidebar.image("podcast-live-icon.svg", caption="", width=50, use_column_width=False)
-
 
 # Dropdown box
     st.sidebar.subheader("Available Podcasts Feeds")
