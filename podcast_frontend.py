@@ -125,7 +125,7 @@ def process_podcast_info(url):
 if __name__ == '__main__':
     main()
 
->>> def create_dict_from_json_files(directory):
+def create_dict_from_json_files(directory):
   """Creates a dictionary of podcast information from the JSON files in the specified directory."""
   podcast_info = {}
   for filename in os.listdir(directory):
