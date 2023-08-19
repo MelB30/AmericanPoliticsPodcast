@@ -55,7 +55,7 @@ process_button = st.sidebar.button("Process Podcast Feed")
                 f"<p style='margin-bottom: 2px; font-size: 22px;'>{podcast_info['podcast_details']['episode_title'].replace('.mp3','')}</p>", unsafe_allow_html=True)
 
         # Display the podcast summary and the cover image in a side-by-side layout
-        col1, col2 = st.columns([7, 3])
+       col1, col2 = st.columns([2, 8])
 
         with col1:
             # Display the podcast episode summary
