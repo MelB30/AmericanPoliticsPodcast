@@ -1,71 +1,144 @@
-import streamlit as st
-import json
+import modal
 
-def load_podcast(file_path):
-    with open(file_path, 'r') as file:
-        data = json.load(file)
-    return data
+def download_whisper():
+  # Load the Whisper model
+  import os
+  import whisper
+  print ("Download the Whisper model")
 
-def main():
-    st.title("Your Podcast Pal - AI Generated Summaries To Save You Time")
+  # Perform download only once and save to Container storage
+  whisper._download(whisper._MODELS["medium"], '/content/podcast/', False)
 
-    # Sidebar to select podcast RSS feed or enter custom URL
-    st.sidebar.header("Select Podcast RSS Feed")
-    podcast_option = st.sidebar.selectbox("Choose a podcast:", ["Podcast 1", "Podcast 2", "Podcast 3", "Custom URL"])
 
-    # Fun and special note for custom URL option
-    st.sidebar.markdown(":tada: **Hey, adventurer!** :tada:")
-    st.sidebar.markdown("Feeling explorative? Choose 'Custom URL' from the dropdown above and enter your very own podcast URL! Then we'll process a summary of the latest episode for you! :sparkles:")
+stub = modal.Stub("corise-podcast-project")
+corise_image = modal.Image.debian_slim().pip_install("feedparser",
+                                                     "https://github.com/openai/whisper/archive/9f70a352f9f8630ab3aa0d06af5cb9532bd8c21d.tar.gz",
+                                                     "requests",
+                                                     "ffmpeg",
+                                                     "openai",
+                                                     "tiktoken",
+                                                     "wikipedia",
+                                                     "ffmpeg-python").apt_install("ffmpeg").run_function(download_whisper)
 
-    # Input field for custom Podcast URL
-    custom_url = ""
-    if podcast_option == "Custom URL":
-        custom_url = st.sidebar.text_input("Enter Podcast URL:")
+@stub.function(image=corise_image, gpu="any", timeout=600)
+def get_transcribe_podcast(rss_url, local_path):
+  print ("Starting Podcast Transcription Function")
+  print ("Feed URL: ", rss_url)
+  print ("Local Path:", local_path)
 
-    # Load available podcasts
-    available_podcasts = {
-        "Podcast 1": load_podcast("podcast-1.json"),
-        "Podcast 2": load_podcast("podcast-2.json"),
-        "Podcast 3": load_podcast("podcast-3.json"),
-    }
+  # Read from the RSS Feed URL
+  import feedparser
+  intelligence_feed = feedparser.parse(rss_url)
+  podcast_title = intelligence_feed['feed']['title']
+  episode_title = intelligence_feed.entries[0]['title']
+  episode_image = intelligence_feed['feed']['image'].href
+  for item in intelligence_feed.entries[0].links:
+    if (item['type'] == 'audio/mpeg'):
+      episode_url = item.href
+  episode_name = "podcast_episode.mp3"
+  print ("RSS URL read and episode URL: ", episode_url)
 
-    # Heading above checkboxes
-    if podcast_option != "Custom URL":
-        st.header("Select podcasts to be summarized in a weekly newsletter!")
+  # Download the podcast episode by parsing the RSS feed
+  from pathlib import Path
+  p = Path(local_path)
+  p.mkdir(exist_ok=True)
 
-    # Display available podcasts with checkboxes (only if "Custom URL" is not selected)
-    selected_podcasts = {}
-    if podcast_option != "Custom URL":
-        for name in available_podcasts.keys():
-            selected = st.checkbox(name, key=name)
-            if selected:
-                selected_podcasts[name] = available_podcasts[name]["podcast_summary"]
+  print ("Downloading the podcast episode")
+  import requests
+  with requests.get(episode_url, stream=True) as r:
+    r.raise_for_status()
+    episode_path = p.joinpath(episode_name)
+    with open(episode_path, 'wb') as f:
+      for chunk in r.iter_content(chunk_size=8192):
+        f.write(chunk)
 
-    # Sidebar: Display selected podcasts and Subscribe button
-    st.sidebar.header("Selected Podcasts for Newsletter")
-    for name in selected_podcasts.keys():
-        st.sidebar.write(name)
-    if st.sidebar.button("Subscribe"):
-        # Create text file with selected summaries
-        with open("selected_summaries.txt", "w") as file:
-            for name, summary in selected_podcasts.items():
-                file.write(f"{name}: {summary}\n")
-        st.sidebar.success("Subscribed! Summaries saved to selected_summaries.txt")
+  print ("Podcast Episode downloaded")
 
-    # Load the selected podcast data from dropdown (only if "Custom URL" is not selected)
-    if podcast_option in available_podcasts and podcast_option != "Custom URL":
-        podcast_data = available_podcasts[podcast_option]
-        cols = st.columns([1, 1])  # Create two columns
-        # Column 1: Image, Podcast Title, Episode Title, Guest, and Summary
-        cols[0].image(podcast_data["podcast_details"]["episode_image"], use_column_width=True)
-        cols[0].header(podcast_data["podcast_details"]["podcast_title"])
-        cols[0].subheader(podcast_data["podcast_details"]["episode_title"])
-        cols[0].markdown("**Guest:** " + podcast_data["podcast_guest"])
-        cols[0].markdown("**Summary:** " + podcast_data["podcast_summary"])
-        # Column 2: Highlights
-        cols[1].markdown("**Highlights:** " + podcast_data["podcast_highlights"])
-    elif podcast_option == "Custom URL":
-        st.write("Custom URL processing not yet implemented.")
+  # Load the Whisper model
+  import os
+  import whisper
 
-if __name__ == "__main__":
-    main()
+  # Load model from saved location
+  print ("Load the Whisper model")
+  model = whisper.load_model('medium', device='cuda', download_root='/content/podcast/')
+
+  # Perform the transcription
+  print ("Starting podcast transcription")
+  result = model.transcribe(local_path + episode_name)
+
+  # Return the transcribed text
+  print ("Podcast transcription completed, returning results...")
+  output = {}
+  output['podcast_title'] = podcast_title
+  output['episode_title'] = episode_title
+  output['episode_image'] = episode_image
+  output['episode_transcript'] = result['text']
+  return output
+
+@stub.function(image=corise_image, secret=modal.Secret.from_name("my-openai-secret"))
+def get_podcast_summary(podcast_transcript):
+  import openai
+  instructPrompt = """
+  As an accomplished copywriter, you orchestrate newsletters that reach thousands of individuals. You've recently enjoyed an insightful podcast and wish to    encapsulate its highlights in a concise summary for your readers. Please draft a summary of the podcast, ensuring to cover all significant discussion points. The full transcript of the podcast is provided below for reference.
+  """
+  request = instructPrompt + podcast_transcript
+  chatOutput = openai.ChatCompletion.create(model="gpt-3.5-turbo-16k",
+                                            messages=[{"role": "system", "content": "You are a helpful assistant."},
+                                                      {"role": "user", "content": request}
+                                                      ]
+                                            )
+  podcastSummary = chatOutput.choices[0].message.content
+  return podcastSummary
+
+@stub.function(image=corise_image, secret=modal.Secret.from_name("my-openai-secret"))
+def get_podcast_guest(podcast_transcript):
+  import wikipedia
+  import json
+  import openai
+  instructPrompt = """
+  As an accomplished news broadcaster, you have interviewed many president. Please draft a summary of President Biden, ensuring to cover all significant discussion points. The full transcript of the podcast is provided below for reference.
+  """
+  request = instructPrompt + podcast_transcript
+  chatOutput = openai.ChatCompletion.create(model="gpt-3.5-turbo-16k",
+                                            messages=[{"role": "system", "content": "You are a helpful assistant."},
+                                                      {"role": "user", "content": request}
+                                                      ]
+                                            )
+  podcastGuest = chatOutput.choices[0].message.content
+  return podcastGuest
+
+@stub.function(image=corise_image, secret=modal.Secret.from_name("my-openai-secret"))
+def get_podcast_highlights(podcast_transcript):
+  import openai
+  instructPrompt = """
+  As an accomplished copywriter, you orchestrate newsletters that reach thousands of individuals. You've recently enjoyed an insightful podcast and wish to    encapsulate its highlights for your readers. Please draft the main highlights of the podcast, ensuring to cover all significant discussion points. The full transcript of the podcast is provided below for reference.
+  """
+  request = instructPrompt + podcast_transcript
+  chatOutput = openai.ChatCompletion.create(model="gpt-3.5-turbo-16k",
+                                            messages=[{"role": "system", "content": "You are a helpful assistant."},
+                                                      {"role": "user", "content": request}
+                                                      ]
+                                            )
+
+
+@stub.function(image=corise_image, secret=modal.Secret.from_name("my-openai-secret"), timeout=1200)
+def process_podcast(url, path):
+  output = {}
+  podcast_details = get_transcribe_podcast.call(url, path)
+  podcast_summary = get_podcast_summary.call(podcast_details['episode_transcript'])
+  podcast_guest = get_podcast_guest.call(podcast_details['episode_transcript'])
+  podcast_highlights = get_podcast_highlights.call(podcast_details['episode_transcript'])
+  output['podcast_details'] = podcast_details
+  output['podcast_summary'] = podcast_summary
+  output['podcast_guest'] = podcast_guest
+  output['podcast_highlights'] = podcast_highlights
+  return output
+
+@stub.local_entrypoint()
+def test_method(url, path):
+  output = {}
+  podcast_details = get_transcribe_podcast.call(url, path)
+  print ("Podcast Summary: ", get_podcast_summary.call(podcast_details['episode_transcript']))
+  print ("Podcast Guest Information: ", get_podcast_guest.call(podcast_details['episode_transcript']))
+  print ("Podcast Highlights: ", get_podcast_highlights.call(podcast_details['episode_transcript']))
+
