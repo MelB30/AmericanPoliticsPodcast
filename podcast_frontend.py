@@ -7,8 +7,6 @@ def main():
 
     available_podcast_info = create_dict_from_json_files('.')
 
-    tcol1, tcol2 = st.columns([2, 8])
-
     with tcol1:
         st.sidebar.image("podcast-live-icon.svg", caption="", width=50, use_column_width=False)
 
