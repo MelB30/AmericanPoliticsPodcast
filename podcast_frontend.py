@@ -30,7 +30,7 @@ def main():
     st.sidebar.markdown(
                 f"<p style='margin-bottom: 5px; color:#000; font-style:italic; font-weight: bold;'>Don't Use RSS feed. Use the castbox Podcast URL</p>", unsafe_allow_html=True)
 
-   url = st.sidebar.text_input("Spotify Podcast URL", placeholder="example: https://open.spotify.com/episode/0jbyb1Io0Ge9H0WBrhg70L")
+    url = st.sidebar.text_input("Spotify Podcast URL", placeholder="example: https://open.spotify.com/episode/0jbyb1Io0Ge9H0WBrhg70L")
 
 process_button = st.sidebar.button("Process Podcast Feed")
     st.sidebar.markdown("**Note**: Podcast processing can take upto 5 mins, please be patient.")
