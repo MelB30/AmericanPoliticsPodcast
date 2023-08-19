@@ -1,125 +1,71 @@
 import streamlit as st
-import modal
 import json
-import os
+
+def load_podcast(file_path):
+    with open(file_path, 'r') as file:
+        data = json.load(file)
+    return data
 
 def main():
-    st.title("Newsletter Dashboard")
+    st.title("Your Podcast Pal - AI Generated Summaries To Save You Time")
 
-    available_podcast_info = create_dict_from_json_files('.')
+    # Sidebar to select podcast RSS feed or enter custom URL
+    st.sidebar.header("Select Podcast RSS Feed")
+    podcast_option = st.sidebar.selectbox("Choose a podcast:", ["Podcast 1", "Podcast 2", "Podcast 3", "Custom URL"])
 
-    # Left section - Input fields
-    st.sidebar.header("Podcast RSS Feeds")
+    # Fun and special note for custom URL option
+    st.sidebar.markdown(":tada: **Hey, adventurer!** :tada:")
+    st.sidebar.markdown("Feeling explorative? Choose 'Custom URL' from the dropdown above and enter your very own podcast URL! Then we'll process a summary of the latest episode for you! :sparkles:")
 
-    # Dropdown box
-    st.sidebar.subheader("Available Podcasts Feeds")
-    selected_podcast = st.sidebar.selectbox("Select Podcast", options=available_podcast_info.keys())
+    # Input field for custom Podcast URL
+    custom_url = ""
+    if podcast_option == "Custom URL":
+        custom_url = st.sidebar.text_input("Enter Podcast URL:")
 
-    if selected_podcast:
+    # Load available podcasts
+    available_podcasts = {
+        "Podcast 1": load_podcast("podcast-1.json"),
+        "Podcast 2": load_podcast("podcast-2.json"),
+        "Podcast 3": load_podcast("podcast-3.json"),
+    }
 
-        podcast_info = available_podcast_info[selected_podcast]
+    # Heading above checkboxes
+    if podcast_option != "Custom URL":
+        st.header("Select podcasts to be summarized in a weekly newsletter!")
 
-        # Right section - Newsletter content
-        st.header("Newsletter Content")
+    # Display available podcasts with checkboxes (only if "Custom URL" is not selected)
+    selected_podcasts = {}
+    if podcast_option != "Custom URL":
+        for name in available_podcasts.keys():
+            selected = st.checkbox(name, key=name)
+            if selected:
+                selected_podcasts[name] = available_podcasts[name]["podcast_summary"]
 
-        # Display the podcast title
-        st.subheader("Episode Title")
-        st.write(podcast_info['podcast_details']['episode_title'])
+    # Sidebar: Display selected podcasts and Subscribe button
+    st.sidebar.header("Selected Podcasts for Newsletter")
+    for name in selected_podcasts.keys():
+        st.sidebar.write(name)
+    if st.sidebar.button("Subscribe"):
+        # Create text file with selected summaries
+        with open("selected_summaries.txt", "w") as file:
+            for name, summary in selected_podcasts.items():
+                file.write(f"{name}: {summary}\n")
+        st.sidebar.success("Subscribed! Summaries saved to selected_summaries.txt")
 
-        # Display the podcast summary and the cover image in a side-by-side layout
-        col1, col2 = st.columns([7, 3])
+    # Load the selected podcast data from dropdown (only if "Custom URL" is not selected)
+    if podcast_option in available_podcasts and podcast_option != "Custom URL":
+        podcast_data = available_podcasts[podcast_option]
+        cols = st.columns([1, 1])  # Create two columns
+        # Column 1: Image, Podcast Title, Episode Title, Guest, and Summary
+        cols[0].image(podcast_data["podcast_details"]["episode_image"], use_column_width=True)
+        cols[0].header(podcast_data["podcast_details"]["podcast_title"])
+        cols[0].subheader(podcast_data["podcast_details"]["episode_title"])
+        cols[0].markdown("**Guest:** " + podcast_data["podcast_guest"])
+        cols[0].markdown("**Summary:** " + podcast_data["podcast_summary"])
+        # Column 2: Highlights
+        cols[1].markdown("**Highlights:** " + podcast_data["podcast_highlights"])
+    elif podcast_option == "Custom URL":
+        st.write("Custom URL processing not yet implemented.")
 
-        with col1:
-            # Display the podcast episode summary
-            st.subheader("Podcast Episode Summary")
-            st.write(podcast_info['podcast_summary'])
-
-        with col2:
-            st.image(podcast_info['podcast_details']['episode_image'], caption="Podcast Cover", width=300, use_column_width=True)
-
-        # Display the podcast guest and their details in a side-by-side layout
-        col3, col4 = st.columns([3, 7])
-
-        with col3:
-            st.subheader("Podcast Guest")
-            st.write(podcast_info['podcast_guest']['name'])
-
-        with col4:
-            st.subheader("Podcast Guest Details")
-            st.write(podcast_info["podcast_guest"]['summary'])
-
-        # Display the five key moments
-        st.subheader("Key Moments")
-        key_moments = podcast_info['podcast_highlights']
-        for moment in key_moments.split('\n'):
-            st.markdown(
-                f"<p style='margin-bottom: 5px;'>{moment}</p>", unsafe_allow_html=True)
-
-    # User Input box
-    st.sidebar.subheader("Add and Process New Podcast Feed")
-    url = st.sidebar.text_input("Link to RSS Feed")
-
-    process_button = st.sidebar.button("Process Podcast Feed")
-
-    if process_button:
-
-        # Call the function to process the URLs and retrieve podcast guest information
-        podcast_info = process_podcast_info(url)
-
-        # Right section - Newsletter content
-        st.header("Newsletter Content")
-
-        # Display the podcast title
-        st.subheader("Episode Title")
-        st.write(podcast_info['podcast_details']['episode_title'])
-
-        # Display the podcast summary and the cover image in a side-by-side layout
-        col1, col2 = st.columns([7, 3])
-
-        with col1:
-            # Display the podcast episode summary
-            st.subheader("Podcast Episode Summary")
-            st.write(podcast_info['podcast_summary'])
-
-        with col2:
-            st.image(podcast_info['podcast_details']['episode_image'], caption="Podcast Cover", width=300, use_column_width=True)
-
-        # Display the podcast guest and their details in a side-by-side layout
-        col3, col4 = st.columns([3, 7])
-
-        with col3:
-            st.subheader("Podcast Guest")
-            st.write(podcast_info['podcast_guest']['name'])
-
-        with col4:
-            st.subheader("Podcast Guest Details")
-            st.write(podcast_info["podcast_guest"]['summary'])
-
-        # Display the five key moments
-        st.subheader("Key Moments")
-        key_moments = podcast_info['podcast_highlights']
-        for moment in key_moments.split('\n'):
-            st.markdown(
-                f"<p style='margin-bottom: 5px;'>{moment}</p>", unsafe_allow_html=True)
-
-def create_dict_from_json_files(folder_path):
-    json_files = [f for f in os.listdir(folder_path) if f.endswith('.json')]
-    data_dict = {}
-
-    for file_name in json_files:
-        file_path = os.path.join(folder_path, file_name)
-        with open(file_path, 'r') as file:
-            podcast_info = json.load(file)
-            podcast_name = podcast_info['podcast_details']['podcast_title']
-            # Process the file data as needed
-            data_dict[podcast_name] = podcast_info
-
-    return data_dict
-
-def process_podcast_info(url):
-    f = modal.Function.lookup("corise-podcast-project", "process_podcast")
-    output = f.call(url, '/content/podcast/')
-    return output
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
