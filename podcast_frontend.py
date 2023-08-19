@@ -124,3 +124,18 @@ def process_podcast_info(url):
 
 if __name__ == '__main__':
     main()
+
+>>> def create_dict_from_json_files(directory):
+  """Creates a dictionary of podcast information from the JSON files in the specified directory."""
+  podcast_info = {}
+  for filename in os.listdir(directory):
+    with open(os.path.join(directory, filename), 'r') as f:
+      podcast_info[filename] = json.load(f)
+
+  # Add the 'podcast_details' key to the dictionary and populate it with the podcast title.
+  for filename, podcast_data in podcast_info.items():
+    podcast_info[filename]['podcast_details'] = {
+        'podcast_title': podcast_data['title'],
+    }
+
+  return podcast_info
