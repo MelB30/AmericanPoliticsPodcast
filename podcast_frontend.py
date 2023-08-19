@@ -7,6 +7,8 @@ def main():
     with open("style.css") as css:
         st.markdown(f'<style>{css.read()}</style>', unsafe_allow_html=True)
 
+    col1, col2 = st.columns([1, 2])
+
     with col1:
         st.image("logo.png", caption="", use_column_width=True)
 
@@ -18,22 +20,23 @@ def main():
     tcol1, tcol2 = st.columns([2, 8])
 
     with tcol1:
-
         st.sidebar.image("podcast-live-icon.svg", caption="", width=50, use_column_width=False)
 
-# Dropdown box
+    # Dropdown box
     st.sidebar.subheader("Available Podcasts Feeds")
     selected_podcast = st.sidebar.selectbox("Select Podcast", options=available_podcast_info.keys())
 
     # User Input box
     st.sidebar.subheader("Add and Process New Podcast Feed")
     st.sidebar.markdown(
-                f"<p style='margin-bottom: 5px; color:#000; font-style:italic; font-weight: bold;'>Don't Use RSS feed. Use the castbox Podcast URL</p>", unsafe_allow_html=True)
+        f"<p style='margin-bottom: 5px; color:#000; font-style:italic; font-weight: bold;'>Don't Use RSS feed. Use the castbox Podcast URL</p>",
+        unsafe_allow_html=True)
 
-     url = st.sidebar.text_input("Spotify Podcast URL", placeholder="example: https://open.spotify.com/episode/0jbyb1Io0Ge9H0WBrhg70L")
+    url = st.sidebar.text_input("Spotify Podcast URL",
+                                placeholder="example: https://open.spotify.com/episode/0jbyb1Io0Ge9H0WBrhg70L")
 
-process_button = st.sidebar.button("Process Podcast Feed")
-        st.sidebar.markdown("**Note**: Podcast processing can take upto 5 mins, please be patient.")
+    process_button = st.sidebar.button("Process Podcast Feed")
+    st.sidebar.markdown("**Note**: Podcast processing can take upto 5 mins, please be patient.")
 
     if selected_podcast:
 
