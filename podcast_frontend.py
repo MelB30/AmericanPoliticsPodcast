@@ -4,7 +4,10 @@ import json
 import os
 
 def main():
-    with open("style.css") as css:
+    # Provide the correct path to the style.css file
+    css_path = os.path.join(os.path.dirname(__file__), "style.css")
+    
+    with open(css_path) as css:
         st.markdown(f'<style>{css.read()}</style>', unsafe_allow_html=True)
 
     available_podcast_info = create_dict_from_json_files('.')
