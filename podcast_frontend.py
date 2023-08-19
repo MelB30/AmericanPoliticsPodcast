@@ -8,7 +8,6 @@ def main():
  with open( "style.css" ) as css:
         st.markdown( f'<style>{css.read()}</style>' , unsafe_allow_html= True)
 
-    col1, col2 = st.columns([2, 8])
     with col1:
         st.image("logo.png", caption="", use_column_width=True)
 
